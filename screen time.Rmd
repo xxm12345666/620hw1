@@ -1,0 +1,141 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-02-04"
+---
+
+```{r}
+install.packages("readxl")
+library(readxl)
+install.packages("ggplot2")
+
+data <- read_excel("/Users/maggiexu/Documents/screen time.xlsx", sheet = "Sheet1")
+head(data)
+```
+PROBLEM 2
+a. Time Series Plot
+```{r}
+library(ggplot2)
+ts1=ggplot(data, aes(x = date, y = daily_total_screen_time)) +
+  geom_line() +
+  labs(title = "Time Series Plot-Daily total screen time (min)", x = "Date", y = "Daily total screen time (min)")
+
+ts2=ggplot(data, aes(x = date, y = daily_total_social_screen_time)) +
+  geom_line() +
+  labs(title = "Time Series Plot-Daily total social screen time (min)", x = "Date", y = "Daily total social screen time (min)")
+
+ts3=ggplot(data, aes(x = date, y = daily_number_of_pickups)) +
+  geom_line() +
+  labs(title = "Time Series Plot-Daily number of pickups", x = "Date", y = "Daily number of pickups")
+
+ts4=ggplot(data, aes(x = date, y = daily_proportion_of_social_screen_time)) +
+  geom_line() +
+  labs(title = "Time Series Plot-Daily proportion of social screen time", x = "Date", y = "Daily proportion of social screen time")
+
+ts5=ggplot(data, aes(x = date, y = daily_duration_per_use)) +
+  geom_line() +
+  labs(title = "Time Series Plot-Daily duration per use", x = "Date", y = "Daily duration per use")
+
+print(ts1)
+print(ts2)
+print(ts3)
+print(ts4)
+print(ts5)
+```
+
+b. Pairwise Scatterplots
+```{r}
+install.packages("GGally")
+library(GGally)
+ggpairs(data,columns=c("daily_total_screen_time","daily_total_social_screen_time","daily_number_of_pickups"),columnLabels=c("daily_total_screen_time","daily_total_social_screen_time","daily_number_of_pickups")+theme_bw())
+ggsave("HD1_b1_b.png")
+```
+c. Occupation Time Curve
+```{r}
+library(ggplot2)
+
+data_long <- tidyr::gather(data, key = "variable", value = "value", 
+                           daily_total_screen_time:daily_duration_per_use)
+
+occupation_curve <- ggplot(data_long, aes(x = date, y = value, color = variable)) +
+  geom_line() +
+  labs(title = "Occupation Time Curve", x = "Date", y = "Value", color = "Variable")
+
+print(occupation_curve)
+```
+
+d. Autocorrelation using acf
+```{r}
+acf(data$daily_total_screen_time, plot = FALSE)
+acf(data$daily_total_social_screen_time, plot = FALSE)
+acf(data$daily_number_of_pickups, plot = FALSE)
+acf(data$daily_proportion_of_social_screen_time, plot = FALSE)
+acf(data$daily_duration_per_use, plot = FALSE)
+
+round(cor(data$daily_proportion_of_social_screen_time,data$daily_duration_per_use))
+acf(data$daily_proportion_of_social_screen_time)
+acf(data$daily_duration_per_use)
+
+```
+
+PROBLEM 3
+a. Transform Time to Angle
+```{r}
+install.packages("circular")
+library(circular)
+data$hour_of_pickup <- as.numeric(format(data$time_of_first_pickup, "%H"))
+head(data$hour_of_pickup)
+data$angle <- circular::circular((data$hour_of_pickup / 24) * 360, units = "degrees")
+
+```
+b. Scatterplot on 24-hour Clock Circle
+```{r}
+circular::plot.circular(data$angle, main = "Scatterplot of Time of First Pickup", col = "blue", border = "black")
+
+```
+c. Histogram Plot on the Circle
+```{r}
+bin_size=1
+total_bins=360/bin_size
+plot(data$angle,stack=TRUE,bins=total_bins,col="blue")
+
+bin_size=10
+total_bins=360/bin_size
+plot(data$angle,stack=TRUE,bins=total_bins,col="blue")
+
+bin_size=100
+total_bins=360/bin_size
+plot(data$angle,stack=TRUE,bins=total_bins,col="blue")
+
+```
+
+PROBLEM 4
+b.
+```{r}
+data$screentime_in_hours= data$daily_total_screen_time / 60
+model= glm(data$daily_number_of_pickups ~ offset(log(data$screentime_in_hours)), family = poisson, data = data)
+summary(model)
+```
+c.
+```{r}
+data$date <- as.POSIXct(data$date)
+data$Xt <- ifelse(weekdays(data$date) %in% c("Saturday", "Sunday"), 0, 1)
+winter_start <- as.POSIXct("2024-01-10") 
+data$Zt <- ifelse(data$date >= winter_start, 1, 0)
+model <- glm(daily_number_of_pickups ~ Xt + Zt, data = data, family = poisson(link = "log"))
+summary(model)
+```
+PROBLEM 5
+```{r}
+
+library(circular)
+
+fit <- mle.vonmises(data$angle)
+mu <- fit$mu
+lambda <- fit$kappa
+angle_830 <- (8 + 30/60) / 24 * 360 
+prob_830_or_later <- pvonmises(angle_830, mu = mu, kappa = lambda)
+cat("Probability of first pickup being 8:30 AM or later:", prob_830_or_later, "\n")
+```
+
+
